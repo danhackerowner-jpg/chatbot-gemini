@@ -1,128 +1,107 @@
-const chatEl = document.getElementById("chat");
-const inputEl = document.getElementById("input");
-const formEl = document.getElementById("composer");
-const clearBtn = document.getElementById("clear");
-const modelSelect = document.getElementById("model");
+let messages = [];
 
-const store = {
-  key: "gemini.flash.history",
-  load(){ try { return JSON.parse(localStorage.getItem(this.key)) ?? []; } catch { return []; } },
-  save(h){ localStorage.setItem(this.key, JSON.stringify(h)); },
-  clear(){ localStorage.removeItem(this.key); }
-};
+// DOM elements
+const chatBox = document.getElementById("chat-box");
+const userInput = document.getElementById("user-input");
+const sendBtn = document.getElementById("send-btn");
 
-let history = store.load();
-let systemPrompt = "You are a fast, helpful chat assistant. Answer briefly but clearly. Use Markdown when useful.";
-
-function el(html){
-  const t = document.createElement("template");
-  t.innerHTML = html.trim();
-  return t.content.firstElementChild;
+// Load chat history from localStorage
+function loadHistory() {
+  const saved = localStorage.getItem("gemini.flash.history");
+  if (saved) {
+    messages = JSON.parse(saved);
+    messages.forEach(msg => addMessage(msg.text, msg.sender, false));
+  }
 }
 
-function addMessage(role, content, typing=false){
-  const letter = role === "user" ? "U" : "G";
-  const msg = el(`<div class="msg">
-    <div class="avatar ${role}">${letter}</div>
-    <div class="bubble ${typing? 'typing' : ''}"></div>
-  </div>`);
-  msg.querySelector(".bubble").textContent = content || "";
-  chatEl.appendChild(msg);
-  chatEl.scrollTop = chatEl.scrollHeight;
-  return msg;
+// Save chat history to localStorage
+function saveHistory() {
+  localStorage.setItem("gemini.flash.history", JSON.stringify(messages));
 }
 
-function updateTypingBubble(msgEl, delta){
-  const bubble = msgEl.querySelector(".bubble");
-  bubble.textContent += delta;
-  chatEl.scrollTop = chatEl.scrollHeight;
+// Add a message to the chat UI
+function addMessage(text, sender, save = true) {
+  const msgEl = document.createElement("div");
+  msgEl.className = `message ${sender}`;
+  msgEl.innerText = text;
+  chatBox.appendChild(msgEl);
+  chatBox.scrollTop = chatBox.scrollHeight;
+
+  if (save) {
+    messages.push({ text, sender });
+    saveHistory();
+  }
 }
 
-function resizeInput(){
-  inputEl.style.height = "auto";
-  inputEl.style.height = Math.min(inputEl.scrollHeight, 180) + "px";
-}
+// Add animated typing effect for bot messages
+async function addStreamingMessage(stream, save = true) {
+  const msgEl = document.createElement("div");
+  msgEl.className = `message bot`;
+  chatBox.appendChild(msgEl);
 
-function historyForServer(){
-  return history.map(m => ({ role: m.role, content: m.content }));
-}
-
-async function sendToServerStream(messages){
-  const body = JSON.stringify({ messages, system: systemPrompt });
-  const model = modelSelect.value;
-  const resp = await fetch("/api/chat/stream", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-Model": model },
-    body
-  });
-  if (!resp.ok) throw new Error("Network error");
-  const reader = resp.body.getReader();
+  let buffer = "";
+  const reader = stream.getReader();
   const decoder = new TextDecoder();
 
-  let buf = "";
-  while (true){
-    const { value, done } = await reader.read();
+  while (true) {
+    const { done, value } = await reader.read();
     if (done) break;
-    buf += decoder.decode(value, { stream: true });
-    let idx;
-    while ((idx = buf.indexOf("\n\n")) !== -1){
-      const chunk = buf.slice(0, idx);
-      buf = buf.slice(idx + 2);
-      if (!chunk.startsWith("data:")) continue;
-      const payload = JSON.parse(chunk.slice(5).trim());
-      if (payload.delta) {
-        yield(payload.delta);
-      } else if (payload.done) {
-        return;
-      } else if (payload.error){
-        throw new Error(payload.error);
+    buffer += decoder.decode(value, { stream: true });
+
+    // Streamed data split by "data: " lines
+    const parts = buffer.split("\n\n");
+    buffer = parts.pop(); // keep last unfinished chunk
+
+    for (const part of parts) {
+      if (part.startsWith("data: ")) {
+        const payload = JSON.parse(part.slice(6));
+        if (payload.delta) {
+          msgEl.innerText += payload.delta;
+          chatBox.scrollTop = chatBox.scrollHeight;
+        }
       }
     }
   }
+
+  // Save final message
+  if (save) {
+    messages.push({ text: msgEl.innerText, sender: "bot" });
+    saveHistory();
+  }
 }
 
-async function handleSubmit(e){
-  e.preventDefault();
-  const text = inputEl.value.trim();
+// Send user input to server
+async function sendMessage() {
+  const text = userInput.value.trim();
   if (!text) return;
-  inputEl.value = "";
-  resizeInput();
 
-  history.push({ role: "user", content: text });
-  addMessage("user", text);
-
-  const msgEl = addMessage("assistant", "", true);
+  addMessage(text, "user");
+  userInput.value = "";
 
   try {
-    const stream = sendToServerStream(historyForServer());
-    for await (const delta of stream){
-      updateTypingBubble(msgEl, delta);
+    const response = await fetch("/api/chat/stream", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: text }),
+    });
+
+    if (!response.body) {
+      throw new Error("No response body");
     }
 
-    const full = msgEl.querySelector(".bubble").textContent;
-    msgEl.querySelector(".bubble").classList.remove("typing");
-    history.push({ role: "assistant", content: full });
-    store.save(history);
-  } catch (err){
-    msgEl.querySelector(".bubble").classList.remove("typing");
-    msgEl.querySelector(".bubble").textContent = "⚠️ " + err.message;
+    await addStreamingMessage(response.body);
+  } catch (err) {
+    console.error(err);
+    addMessage("⚠️ Error: " + err.message, "bot");
   }
 }
 
-formEl.addEventListener("submit", handleSubmit);
-inputEl.addEventListener("input", resizeInput);
-resizeInput();
-
-clearBtn.addEventListener("click", () => {
-  history = [];
-  store.clear();
-  chatEl.innerHTML = "";
+// Event listeners
+sendBtn.addEventListener("click", sendMessage);
+userInput.addEventListener("keypress", (e) => {
+  if (e.key === "Enter") sendMessage();
 });
 
-if (history.length === 0){
-  addMessage("assistant", "Hey! I’m **Gemini Flash**. Ask me anything ✨");
-}else{
-  for (const m of history){
-    addMessage(m.role, m.content);
-  }
-}
+// Load chat history when app starts
+loadHistory();
+                                       
