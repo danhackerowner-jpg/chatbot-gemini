@@ -1,0 +1,19 @@
+{
+  "name": "gemini-flash-chat",
+  "version": "1.0.0",
+  "description": "Fancy animated web chat UI powered by Google Gemini 2.0 Flash, ready for Render.com",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "NODE_ENV=development node index.js"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.21.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "morgan": "^1.10.0",
+    "serve-static": "^1.15.0"
+  }
+}

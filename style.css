@@ -1,0 +1,145 @@
+/* Fancy animated UI — glass, gradients, soft motion */
+:root{
+  --bg: #0b0f1a;
+  --panel: rgba(255,255,255,0.08);
+  --border: rgba(255,255,255,0.15);
+  --text: #e8edf7;
+  --muted: #93a0b4;
+  --accent1: #6d9eff;
+  --accent2: #b56dff;
+  --accent3: #6dffc7;
+}
+
+*{ box-sizing: border-box; }
+html,body{ height:100%; }
+body{
+  margin:0;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji", "Segoe UI Emoji", sans-serif;
+  color:var(--text);
+  background: radial-gradient(1200px 800px at 10% 10%, rgba(109,158,255,0.25), transparent 60%),
+              radial-gradient(1200px 800px at 90% 90%, rgba(181,109,255,0.22), transparent 60%),
+              linear-gradient(180deg, #091020, #0b0f1a 40%, #0b0f1a);
+  overflow:hidden;
+}
+
+.bg{ position:fixed; inset:0; pointer-events:none; }
+
+.shell{
+  position:relative;
+  max-width: 920px;
+  height: 100vh;
+  margin: 0 auto;
+  padding: 16px;
+  display:flex;
+  flex-direction: column;
+}
+
+.glow{
+  position:absolute; inset:0; border-radius:28px;
+  padding:1px;
+  background: conic-gradient(from 0deg, var(--accent1), var(--accent2), var(--accent3), var(--accent1));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  animation: rotate 8s linear infinite;
+  filter: blur(6px) saturate(140%);
+}
+@keyframes rotate { to { transform: rotate(360deg); } }
+
+.topbar, .chat, .composer, .foot{
+  position:relative;
+  border:1px solid var(--border);
+  background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.05));
+  backdrop-filter: blur(10px);
+  border-radius: 22px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+}
+
+.topbar{
+  display:flex; align-items:center; justify-content:space-between;
+  padding: 12px 14px;
+}
+
+.brand{ display:flex; align-items:center; gap:10px; }
+.brand img{ width:28px; height:28px; filter: drop-shadow(0 4px 10px rgba(109,158,255,0.5)); }
+.brand h1{ font-size: 16px; margin:0; font-weight:700; letter-spacing:0.3px; }
+
+.settings{ display:flex; gap:10px; align-items:center; }
+select, button.ghost{
+  height:36px; border-radius:12px; border:1px solid var(--border);
+  background: rgba(255,255,255,0.06); color:var(--text);
+  padding: 0 10px; font-weight:600;
+}
+button.ghost{ cursor:pointer; }
+
+.chat{
+  flex: 1;
+  margin: 14px 0;
+  padding: 16px;
+  overflow:auto;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+
+.msg{
+  display:grid;
+  grid-template-columns: 42px 1fr;
+  gap: 12px;
+  align-items:flex-start;
+  opacity: 0;
+  transform: translateY(6px) scale(0.98);
+  animation: pop 280ms ease forwards;
+}
+@keyframes pop{
+  to { opacity: 1; transform: none; }
+}
+.avatar{
+  width:42px;height:42px;border-radius:14px;display:grid;place-items:center;
+  background: linear-gradient(135deg, var(--accent1), var(--accent2));
+  font-weight:800; color:white; box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+}
+.avatar.user{ background: linear-gradient(135deg, #6dffc7, #6d9eff); }
+
+.bubble{
+  padding: 12px 14px;
+  border-radius:16px;
+  border:1px solid var(--border);
+  background: rgba(9, 14, 28, 0.6);
+  line-height:1.6;
+  white-space:pre-wrap;
+  word-wrap:break-word;
+}
+
+.typing:after{
+  content:""; display:inline-block; width:1ch; border-right:2px solid var(--accent1);
+  animation: blink 800ms steps(1) infinite;
+  margin-left: 2px; height:1em; vertical-align:baseline;
+}
+@keyframes blink{ 50%{ opacity: 0; } }
+
+.composer{
+  display:flex; gap:8px; align-items:center;
+  padding: 8px;
+}
+#input{
+  flex:1;
+  border-radius:14px; border:1px solid var(--border);
+  padding: 12px 14px; background: rgba(255,255,255,0.07); color:var(--text);
+  resize:none; max-height: 180px; outline:none;
+}
+#send{
+  width:48px;height:48px;border-radius:16px; border:1px solid var(--border);
+  background: linear-gradient(135deg, var(--accent1), var(--accent2));
+  color:white; font-size:18px; font-weight:900; cursor:pointer;
+  transform: translateZ(0);
+  transition: transform 120ms ease, filter 120ms ease;
+}
+#send:active{ transform: scale(0.98); }
+
+.foot{ padding:10px 12px; color: var(--muted); text-align:center; font-size: 12px; }
+
+@media (max-width: 640px){
+  .shell{ padding: 10px; }
+  .topbar, .chat, .composer, .foot{ border-radius: 18px; }
+  .avatar{ border-radius: 12px; }
+}
